@@ -1,6 +1,4 @@
 import memewizard2
-import colorama
 
-memes = memewizard2.Meme.YouTubeFetch()
-for i in range(memes.count):
-    print(memes.query(i).history)
+memes = memewizard2.fetch_memes()
+print(memes[0].info().year)
