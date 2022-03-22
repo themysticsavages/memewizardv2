@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from bs4 import BeautifulSoup
-from typing import List
 import pytrends.request
 import requests
 import random
@@ -31,7 +30,7 @@ class _Utils:
         "With",
         "?",
         ".",
-        "Are You",
+        "Are",
         "FINISHED",
     ]
 
@@ -63,22 +62,27 @@ class MemeInfo:
     """Where the meme originated from, usually a social media"""
     year: int = None
     """Year the meme was made"""
-    types: List[str] = None
+    types: 'list[str]' = None
     """What kinds of meme it is, can be 'Exploitable', an 'Image Macro', etc"""
 
-    def complete(self):
+    def complete(self) -> bool:
         """Check if a meme contains all it's information"""
 
         return not any(x is None for x in list(self.__dict__.values()))
 
 
-@dataclass
 class MemeFunc:
-    """Meme functions to do things like find trend history, fetch meme info, and more"""
+    """
+    Meme functions to do things like find trend history, fetch meme info, and more
+    If the meme does not exist in KnowYourMeme, fetching meme info will not work.
+    """
 
-    _name: str
+    def __init__(self, name) -> None:
+        self._name = name
+    
+    def __repr__(self) -> str:
+        return self._name
 
-    @property
     def history(self) -> list:
         """Google Search trends"""
 
@@ -93,9 +97,8 @@ class MemeFunc:
         search = trend.interest_over_time()
         return [e[0] for e in search.values.tolist()]
 
-    @property
     def url(self) -> str:
-        """KnowYourMeme url for meme (can fail if meme does not exist)"""
+        """KnowYourMeme url for meme"""
 
         doc = requests.get(
             "https://www.google.com/search?q={}&surl=1&safe=active&ssui=on".format(
@@ -115,9 +118,8 @@ class MemeFunc:
             .split("&sa")[0]
         )
 
-    @property
     def image(self) -> str:
-        """Find relevant images for a list of memes."""
+        """Relevant image for meme"""
 
         r = requests.get(
             "https://www.google.com/search?q={}&rlz=1CAOUAQ_enUS980&source=lnms&tbm=isch&biw=1517&bih=750&dpr=0.9&surl=1&safe=active&ssui=on#imgrc=1QhXmjkgq_MRQM".format(
@@ -131,12 +133,11 @@ class MemeFunc:
             r"https://|http://", images[random.randrange(1, len(images))]["src"]
         )[-1].replace("&s", "")
 
-    @property
     def info(self) -> MemeInfo:
         """KnowYourMeme data such as it's origin, the year it came out, etc."""
 
         r = requests.get(
-            self.url,
+            self.url(),
             headers={
                 "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36"
             },
@@ -163,79 +164,42 @@ class MemeFunc:
         }
         return MemeInfo(*list(json.values()))
 
+def fetch_memes() -> 'list[MemeFunc]':
+    '''Fetch memes from YouTube'''
 
-class Meme:
-    """Exists as a class simply to keep things sorted"""
-
-    class YouTubeFetch:
-        """Fetch memes from YouTube"""
-
-        def __init__(self) -> None:
-            r = requests.get("https://www.youtube.com/c/LessonsinMemeCulture/videos")
-            big_response = json.loads(
-                r.text.split("var ytInitialData =")[1].split(";</script>")[0]
+    r = requests.get("https://www.youtube.com/c/LessonsinMemeCulture/videos")
+    big_response = json.loads(
+        r.text.split("var ytInitialData =")[1].split(";</script>")[0]
+    )
+    filtere = big_response["contents"]["twoColumnBrowseResultsRenderer"][
+        "tabs"
+    ][1]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0][
+        "itemSectionRenderer"
+    ][
+        "contents"
+    ][
+        0
+    ][
+        "gridRenderer"
+    ][
+        "items"
+    ]
+    res = []
+    for i in range(len(filtere)):
+        try:
+            string = (
+                filtere[i]["gridVideoRenderer"]["title"]["runs"][0]["text"]
+                .replace("“", '"')
+                .replace("”", '"')
             )
-            filtere = big_response["contents"]["twoColumnBrowseResultsRenderer"][
-                "tabs"
-            ][1]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0][
-                "itemSectionRenderer"
-            ][
-                "contents"
-            ][
-                0
-            ][
-                "gridRenderer"
-            ][
-                "items"
-            ]
-            res = []
-            for i in range(len(filtere)):
-                try:
-                    string = (
-                        filtere[i]["gridVideoRenderer"]["title"]["runs"][0]["text"]
-                        .replace("“", '"')
-                        .replace("”", '"')
-                    )
-                    token = _Utils.regex.sub("", string)
-                    words = re.findall('"([^"]*)"', string)
-                    if len(words) > 0:
-                        meme = "".join([s.split("_")[0] for s in words[0]])
-                        res.append(meme)
-                    else:
-                        res.append(_Utils.subjectify(token))
-                except KeyError:
-                    break
+            token = _Utils.regex.sub("", string)
+            words = re.findall('"([^"]*)"', string)
+            if len(words) > 0:
+                meme = "".join([s.split("_")[0] for s in words[0]])
+                res.append(meme)
+            else:
+                res.append(_Utils.subjectify(token))
+        except KeyError:
+            break
 
-            self._meme = res
-            """
-            Memes collected. If you want to use these directly, the
-            ``all()`` method is preferred as it comes with formatting
-            """
-            self.count: int = len(self._meme)
-            """Number of memes collected"""
-
-        def all(self, format: bool = True) -> list:
-            """
-            Returns every meme automatically created when instantiating
-            YouTubeFetch. Formatting strips meme titles and removes
-            any double spaces
-            """
-
-            return (
-                [m.strip().replace("  ", " ") for m in self._meme]
-                if format == True
-                else self._meme
-            )
-
-        def query(self, sel: int):
-            """Select a specific meme by its index"""
-
-            selc = None
-            resp = MemeFunc(self._meme[sel]).info.title
-
-            try:
-                selc = _Utils.subjectify(resp.split("/ ")[1]).lower()
-            except IndexError:
-                selc = _Utils.subjectify(resp).lower()
-
-            return MemeFunc(selc)
+    return [MemeFunc(m.strip().replace("  ", " ").split("/ ")[1] if "/" in m else m.strip().replace("  ", " ")) for m in res]
