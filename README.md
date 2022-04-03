@@ -9,4 +9,4 @@ The Berserk Skeletons Staring At You
 '2022'
 ```
 
-<sub>also don't worry this won't actually be called memewizard it will be merged into the main code ;)</sub>
+<sub>also don't worry this won't actually be called memewizardv2 it will be merged into the main code ;)</sub>
